@@ -1,0 +1,2082 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Timeless Foods • Self-Ordering Kiosk</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Happy+Monkey&family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <style>
+    @font-face {
+      font-family: 'Silver Garden';
+      src: local('Silver Garden'), local('SilverGarden'), local('Silver Garden Regular');
+      font-weight: normal;
+      font-style: normal;
+      font-display: swap;
+    }
+
+    * {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .font-timeless {
+      font-family: 'Silver Garden', 'Happy Monkey', 'Playfair Display', Georgia, serif;
+      letter-spacing: 0.02em;
+    }
+
+    /* Hide scrollbar cleanly inside the kiosk viewport while preserving smooth scroll */
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+
+    /* Subtle realistic drop shadow under top-down plates */
+    .plate-shadow {
+      box-shadow:
+        0 14px 26px -6px rgba(15, 23, 42, 0.14),
+        0 4px 10px -2px rgba(15, 23, 42, 0.06),
+        inset 0 2px 4px rgba(255, 255, 255, 0.9);
+    }
+
+    /* Container for the inserted burger photo */
+    .burger-photo-card {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      border-radius: 0;
+      overflow: hidden;
+      background-color: #23272b;
+    }
+
+    .burger-photo-card img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      image-rendering: -webkit-optimize-contrast;
+    }
+
+    /* Card elevation matching reference UI */
+    .food-card {
+      box-shadow: 0 10px 28px rgba(17, 24, 39, 0.035);
+      transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.22s ease;
+    }
+    .food-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 16px 34px rgba(17, 24, 39, 0.07);
+    }
+    .food-card:active {
+      transform: scale(0.985);
+    }
+
+    /* Floating dark cart pill shadow */
+    .cart-pill-shadow {
+      box-shadow: 0 16px 36px rgba(0, 0, 0, 0.28), 0 4px 12px rgba(0, 0, 0, 0.14);
+    }
+
+    /* Modal & Drawer transitions */
+    @keyframes slideUp {
+      from {
+        transform: translateY(100%);
+        opacity: 0.6;
+      }
+      to {
+        transform: translateY(0);
+        opacity: 1;
+      }
+    }
+    .animate-slide-up {
+      animation: slideUp 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+
+    @keyframes popBounce {
+      0% { transform: scale(1); }
+      40% { transform: scale(1.08); }
+      100% { transform: scale(1); }
+    }
+    .animate-pop {
+      animation: popBounce 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    @keyframes subtlePulse {
+      0%, 100% {
+        transform: scale(1);
+        box-shadow: 0 10px 28px rgba(147, 176, 66, 0.25);
+      }
+      50% {
+        transform: scale(1.025);
+        box-shadow: 0 14px 36px rgba(147, 176, 66, 0.45);
+      }
+    }
+    .start-btn-pulse {
+      animation: subtlePulse 2.4s ease-in-out infinite;
+    }
+
+    /* NFC Wave & Card Tap Animations */
+    @keyframes nfcWavePulse {
+      0% {
+        transform: scale(0.78);
+        opacity: 0.85;
+      }
+      100% {
+        transform: scale(1.55);
+        opacity: 0;
+      }
+    }
+    .nfc-wave-1 {
+      animation: nfcWavePulse 2s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+    }
+    .nfc-wave-2 {
+      animation: nfcWavePulse 2s cubic-bezier(0.16, 1, 0.3, 1) 0.65s infinite;
+    }
+
+    @keyframes cardHoverTap {
+      0%, 100% {
+        transform: translate(0px, 0px) rotate(-6deg);
+      }
+      50% {
+        transform: translate(-5px, 6px) rotate(-2deg);
+      }
+    }
+    .nfc-card-hover {
+      animation: cardHoverTap 2.2s ease-in-out infinite;
+    }
+
+    @keyframes cardReadingLock {
+      0% {
+        transform: translate(0px, 0px) rotate(-4deg) scale(1);
+      }
+      50% {
+        transform: translate(-8px, 9px) rotate(0deg) scale(0.96);
+      }
+      100% {
+        transform: translate(-6px, 7px) rotate(0deg) scale(0.97);
+      }
+    }
+    .nfc-card-reading {
+      animation: cardReadingLock 0.7s ease-in-out infinite;
+    }
+
+    /* Attract Screen Smooth Transition */
+    #attract-screen {
+      position: absolute;
+      inset: 0;
+      z-index: 40;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      transition: opacity 0.4s cubic-bezier(0.22, 1, 0.36, 1), transform 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    #attract-screen.attract-hidden {
+      opacity: 0;
+      transform: scale(1.03);
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body class="bg-[#ECEEF2] min-h-screen flex items-center justify-center p-0 sm:p-4 md:p-6 select-none">
+
+  <!-- Kiosk Bezel Frame -->
+  <div class="relative w-full max-w-[440px] h-screen sm:h-[860px] sm:max-h-[92vh] bg-[#141416] sm:rounded-[42px] sm:p-[14px] shadow-[0_30px_80px_rgba(0,0,0,0.22)] flex flex-col overflow-hidden">
+
+    <!-- Top Hardware Speaker & Camera Notch -->
+    <div class="hidden sm:flex items-center justify-center gap-2 pt-1 pb-2.5 shrink-0">
+      <span class="w-2 h-2 rounded-full bg-[#2A2A2E]"></span>
+      <span class="w-12 h-1.5 rounded-full bg-[#2A2A2E]"></span>
+    </div>
+
+    <!-- Kiosk Screen Viewport -->
+    <main class="relative flex-1 w-full bg-[#FAFAFA] sm:rounded-[28px] overflow-hidden flex flex-col">
+
+      <!-- ========================================================= -->
+      <!-- 1. DEFAULT ATTRACT / WELCOME SCREEN ("TIMELESS FOODS")    -->
+      <!-- ========================================================= -->
+      <section
+        id="attract-screen"
+        aria-label="Welcome Attract Screen"
+        class="relative flex flex-col justify-between overflow-hidden bg-black"
+      >
+        <!-- Full-Bleed Background Meal Image -->
+        <img
+          id="attractHeroImage"
+          src="https://images.unsplash.com/photo-1594212699903-ec8a3eca50f5?auto=format&fit=crop&w=900&q=85"
+          alt="Gourmet Burger, Crispy Fries and Cold Cola Meal"
+          onerror="this.onerror=null;this.src='https://placehold.co/900x1600/0B2447/FFFFFF?text=Timeless+Foods';"
+          class="absolute inset-0 w-full h-full object-cover object-center z-0"
+        />
+
+        <!-- Subtle Top & Bottom Readability Scrim (keeps burger & fries vivid in center) -->
+        <div
+          class="pointer-events-none absolute inset-0 z-10"
+          style="background: linear-gradient(180deg, rgba(6, 14, 28, 0.72) 0%, rgba(6, 14, 28, 0.18) 34%, rgba(6, 14, 28, 0.12) 62%, rgba(6, 14, 28, 0.78) 100%);"
+        ></div>
+
+        <!-- Top Brand Headline (Custom Modular Block Font: TIMELESS FOODS) + Prompt -->
+        <div class="relative z-20 pt-10 px-6 text-center">
+          <h1 class="sr-only">Timeless Foods</h1>
+          <div
+            aria-hidden="true"
+            class="flex flex-col items-center justify-center gap-2 select-none"
+            style="filter: drop-shadow(0 6px 18px rgba(0, 0, 0, 0.65));"
+          >
+            <!-- TIMELESS (8 glyphs @ 100x100 + 8px gap = 856x100) -->
+            <svg
+              viewBox="0 0 856 100"
+              class="w-[310px] sm:w-[348px] max-w-full h-auto text-white"
+              fill="currentColor"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <!-- T -->
+              <path transform="translate(0,0)" d="M 0,28 Q 0,0 28,0 L 72,0 Q 100,0 100,28 L 100,56 L 69,56 L 69,30 L 64,30 L 64,100 L 36,100 L 36,30 L 31,30 L 31,56 L 0,56 Z" />
+              <!-- I -->
+              <path transform="translate(108,0)" d="M 0,0 L 100,0 L 100,30 L 66,30 L 66,70 L 100,70 L 100,100 L 0,100 L 0,70 L 34,70 L 34,30 L 0,30 Z" />
+              <!-- M -->
+              <path transform="translate(216,0)" d="M 0,28 Q 0,0 28,0 L 72,0 Q 100,0 100,28 L 100,100 L 70,100 L 70,30 L 65,30 L 65,100 L 35,100 L 35,30 L 30,30 L 30,100 L 0,100 Z" />
+              <!-- E -->
+              <path transform="translate(324,0)" d="M 0,28 Q 0,0 28,0 L 100,0 L 100,29 L 32,29 L 32,35 L 100,35 L 100,65 L 32,65 L 32,71 L 100,71 L 100,100 L 28,100 Q 0,100 0,72 Z" />
+              <!-- L -->
+              <path transform="translate(432,0)" d="M 0,0 L 30,0 L 30,70 L 100,70 L 100,100 L 28,100 Q 0,100 0,72 Z" />
+              <!-- E -->
+              <path transform="translate(540,0)" d="M 0,28 Q 0,0 28,0 L 100,0 L 100,29 L 32,29 L 32,35 L 100,35 L 100,65 L 32,65 L 32,71 L 100,71 L 100,100 L 28,100 Q 0,100 0,72 Z" />
+              <!-- S -->
+              <path transform="translate(648,0)" d="M 0,28 Q 0,0 28,0 L 100,0 L 100,29 L 31,29 L 31,35 L 72,35 Q 100,35 100,63 L 100,72 Q 100,100 72,100 L 0,100 L 0,71 L 69,71 L 69,65 L 28,65 Q 0,65 0,37 Z" />
+              <!-- S -->
+              <path transform="translate(756,0)" d="M 0,28 Q 0,0 28,0 L 100,0 L 100,29 L 31,29 L 31,35 L 72,35 Q 100,35 100,63 L 100,72 Q 100,100 72,100 L 0,100 L 0,71 L 69,71 L 69,65 L 28,65 Q 0,65 0,37 Z" />
+            </svg>
+
+            <!-- FOODS (5 glyphs @ 100x100 + 10px gap = 540x100) -->
+            <svg
+              viewBox="0 0 540 100"
+              class="w-[216px] sm:w-[244px] h-auto text-white"
+              fill="currentColor"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <!-- F -->
+              <path transform="translate(0,0)" d="M 0,28 Q 0,0 28,0 L 100,0 L 100,29 L 32,29 L 32,35 L 100,35 L 100,65 L 30,65 L 30,100 L 0,100 Z" />
+              <!-- O -->
+              <path transform="translate(110,0)" fill-rule="evenodd" d="M 28,0 L 72,0 Q 100,0 100,28 L 100,72 Q 100,100 72,100 L 28,100 Q 0,100 0,72 L 0,28 Q 0,0 28,0 Z M 30,30 L 30,70 L 70,70 L 70,30 Z" />
+              <!-- O -->
+              <path transform="translate(220,0)" fill-rule="evenodd" d="M 28,0 L 72,0 Q 100,0 100,28 L 100,72 Q 100,100 72,100 L 28,100 Q 0,100 0,72 L 0,28 Q 0,0 28,0 Z M 30,30 L 30,70 L 70,70 L 70,30 Z" />
+              <!-- D -->
+              <path transform="translate(330,0)" fill-rule="evenodd" d="M 0,0 L 72,0 Q 100,0 100,28 L 100,72 Q 100,100 72,100 L 0,100 Z M 30,30 L 30,70 L 70,70 L 70,30 Z" />
+              <!-- S -->
+              <path transform="translate(440,0)" d="M 0,28 Q 0,0 28,0 L 100,0 L 100,29 L 31,29 L 31,35 L 72,35 Q 100,35 100,63 L 100,72 Q 100,100 72,100 L 0,100 L 0,71 L 69,71 L 69,65 L 28,65 Q 0,65 0,37 Z" />
+            </svg>
+          </div>
+
+          <p class="mt-3 text-[12px] font-medium text-white/85 drop-shadow-[0_2px_8px_rgba(0,0,0,0.6)]">
+            Explore the menu and order in a few taps.
+          </p>
+        </div>
+
+        <!-- Bottom CTA Button Directly Over Full-Bleed Background -->
+        <div class="relative z-20 pb-9 px-8 flex flex-col items-center justify-center gap-2.5">
+          <!-- Primary White CTA Button ("ORDER NOW" in matching modular block font) -->
+          <button
+            id="touchToStartBtn"
+            type="button"
+            class="w-full max-w-[260px] py-3.5 px-6 rounded-[10px] bg-white text-black shadow-[0_10px_26px_rgba(10,26,48,0.35)] hover:brightness-95 active:scale-[0.97] transition-all duration-200 cursor-pointer flex items-center justify-center"
+          >
+            <span class="sr-only">Order Now</span>
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 892 100"
+              class="h-[18px] w-auto text-black"
+              fill="currentColor"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <!-- O -->
+              <path transform="translate(0,0)" fill-rule="evenodd" d="M 28,0 L 72,0 Q 100,0 100,28 L 100,72 Q 100,100 72,100 L 28,100 Q 0,100 0,72 L 0,28 Q 0,0 28,0 Z M 30,30 L 30,70 L 70,70 L 70,30 Z" />
+              <!-- R -->
+              <path transform="translate(108,0)" d="M 0,0 L 72,0 Q 100,0 100,28 L 100,34 Q 100,62 72,62 L 65,62 L 65,68 L 100,68 L 100,100 L 36,100 L 36,68 L 30,68 L 30,100 L 0,100 L 0,63 Q 0,35 28,35 L 69,35 L 69,29 L 0,29 Z" />
+              <!-- D -->
+              <path transform="translate(216,0)" fill-rule="evenodd" d="M 0,0 L 72,0 Q 100,0 100,28 L 100,72 Q 100,100 72,100 L 0,100 Z M 30,30 L 30,70 L 70,70 L 70,30 Z" />
+              <!-- E -->
+              <path transform="translate(324,0)" d="M 0,28 Q 0,0 28,0 L 100,0 L 100,29 L 32,29 L 32,35 L 100,35 L 100,65 L 32,65 L 32,71 L 100,71 L 100,100 L 28,100 Q 0,100 0,72 Z" />
+              <!-- R -->
+              <path transform="translate(432,0)" d="M 0,0 L 72,0 Q 100,0 100,28 L 100,34 Q 100,62 72,62 L 65,62 L 65,68 L 100,68 L 100,100 L 36,100 L 36,68 L 30,68 L 30,100 L 0,100 L 0,63 Q 0,35 28,35 L 69,35 L 69,29 L 0,29 Z" />
+              <!-- N -->
+              <path transform="translate(576,0)" d="M 0,0 L 36,0 Q 64,0 64,28 L 64,70 L 70,70 L 70,0 L 100,0 L 100,72 Q 100,100 72,100 L 64,100 Q 36,100 36,72 L 36,30 L 30,30 L 30,100 L 0,100 Z" />
+              <!-- O -->
+              <path transform="translate(684,0)" fill-rule="evenodd" d="M 28,0 L 72,0 Q 100,0 100,28 L 100,72 Q 100,100 72,100 L 28,100 Q 0,100 0,72 L 0,28 Q 0,0 28,0 Z M 30,30 L 30,70 L 70,70 L 70,30 Z" />
+              <!-- W -->
+              <path transform="translate(792,0)" d="M 0,72 Q 0,100 28,100 L 72,100 Q 100,100 100,72 L 100,0 L 70,0 L 70,70 L 65,70 L 65,0 L 35,0 L 35,70 L 30,70 L 30,0 L 0,0 Z" />
+            </svg>
+          </button>
+        </div>
+      </section>
+
+      <!-- ========================================================= -->
+      <!-- 2. MAIN SELF-ORDERING MENU SCREEN                         -->
+      <!-- ========================================================= -->
+      <header class="px-6 pt-7 pb-3 bg-[#FAFAFA]/95 backdrop-blur-md z-10 shrink-0">
+        <!-- Live Search Input -->
+        <div class="relative flex items-center group mb-1">
+          <input
+            id="searchInput"
+            type="text"
+            placeholder="Search"
+            autocomplete="off"
+            aria-label="Search food menu"
+            class="w-full bg-transparent text-[20px] sm:text-[21px] font-semibold tracking-tight text-[#1E1E1E] placeholder-[#C4C4C4] focus:outline-none pr-9 transition-colors"
+          />
+          <button
+            id="clearSearchBtn"
+            type="button"
+            aria-label="Clear search"
+            class="hidden absolute right-0 p-1.5 rounded-full text-gray-400 hover:text-gray-700 hover:bg-gray-200/60 transition cursor-pointer"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <!-- Results Counter + Return to Welcome Button -->
+        <div class="mt-0.5 flex items-center justify-between">
+          <h2 id="resultsHeading" class="text-[22px] sm:text-[24px] font-bold tracking-tight text-[#343846]">
+            Food 18 Results
+          </h2>
+          <button
+            id="backToWelcomeBtn"
+            type="button"
+            title="Return to Start Screen"
+            aria-label="Return to Start Screen"
+            class="w-7 h-7 rounded-full bg-white border border-gray-100 shadow-2xs flex items-center justify-center text-gray-400 hover:text-[#1E1E1E] transition cursor-pointer"
+          >
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M3 12l9-9 9 9M5 10v10h14V10" />
+            </svg>
+          </button>
+        </div>
+
+        <!-- Category Filter Pills -->
+        <div id="categoryBar" class="mt-4 flex items-center gap-2 overflow-x-auto no-scrollbar pb-1">
+          <!-- Populated dynamically by JS -->
+        </div>
+      </header>
+
+      <!-- Scrollable 2-Column Product Grid -->
+      <section
+        id="menuScrollContainer"
+        class="flex-1 overflow-y-auto no-scrollbar px-5 pt-2 pb-28"
+      >
+        <div id="productGrid" class="grid grid-cols-2 gap-4">
+          <!-- Product Cards rendered here -->
+        </div>
+
+        <!-- Empty Search State -->
+        <div id="emptyState" class="hidden flex-col items-center justify-center text-center py-16 px-6">
+          <div class="w-16 h-16 rounded-full bg-white shadow-sm flex items-center justify-center mb-3 text-gray-300">
+            <svg class="w-8 h-8" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35m1.85-5.15a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </div>
+          <p class="text-[16px] font-bold text-[#1E1E1E]">No dishes found</p>
+          <p class="text-xs text-gray-400 mt-1">Try searching for Cookies, Brownies, Panini, Bagel, Juice, or Fries.</p>
+          <button
+            id="resetFiltersBtn"
+            type="button"
+            class="mt-4 px-4 py-2 rounded-full bg-[#1C1C1C] text-white text-xs font-semibold hover:bg-black transition cursor-pointer"
+          >
+            Reset Search
+          </button>
+        </div>
+      </section>
+
+      <!-- Subtle Bottom Fade Gradient -->
+      <div class="pointer-events-none absolute bottom-0 inset-x-0 h-24 bg-gradient-to-t from-[#FAFAFA] via-[#FAFAFA]/85 to-transparent z-10"></div>
+
+      <!-- 3. FLOATING BOTTOM CART PILL -->
+      <div class="absolute bottom-5 inset-x-0 flex justify-center z-20 px-4">
+        <button
+          id="floatingCartBtn"
+          type="button"
+          class="cart-pill-shadow bg-[#1C1C1C] hover:bg-[#121212] active:scale-95 text-white rounded-full pl-2.5 pr-6 py-2.5 flex items-center gap-3.5 transition-all duration-200 cursor-pointer"
+        >
+          <!-- Pastel Yellow Circular Badge with Bag Icon & Notification Dot -->
+          <span class="relative w-10 h-10 rounded-full bg-[#F6DF7B] flex items-center justify-center text-[#1C1C1C] shrink-0">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+            </svg>
+            <span id="cartDot" class="absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full bg-[#FF7A2F] border-2 border-[#F6DF7B]"></span>
+          </span>
+
+          <!-- Dynamic Item Count Text -->
+          <span id="floatingCartLabel" class="text-[15px] font-semibold tracking-tight text-white">
+            2 items
+          </span>
+        </button>
+      </div>
+
+      <!-- ========================================================= -->
+      <!-- ITEM CUSTOMIZATION / DETAIL MODAL                         -->
+      <!-- ========================================================= -->
+      <div
+        id="itemModalOverlay"
+        class="hidden absolute inset-0 bg-black/40 backdrop-blur-[2px] z-30 flex items-end justify-center"
+      >
+        <div
+          id="itemModalSheet"
+          class="w-full bg-white rounded-t-[30px] p-6 pb-7 shadow-2xl animate-slide-up max-h-[88%] flex flex-col"
+        >
+          <!-- Header & Close -->
+          <div class="flex items-center justify-between mb-2">
+            <span class="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-500 bg-orange-50 px-2.5 py-1 rounded-full">
+              <span class="text-orange-500">🔥</span>
+              <span id="modalCalories">185 Calories</span>
+            </span>
+            <button
+              id="closeItemModalBtn"
+              type="button"
+              aria-label="Close item details"
+              class="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-600 transition cursor-pointer"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          <div class="overflow-y-auto no-scrollbar space-y-5 pr-0.5">
+            <!-- Plate Preview -->
+            <div class="flex flex-col items-center text-center pt-1">
+              <div id="modalPlateVisual" class="w-36 h-36 rounded-full plate-shadow bg-white p-2 flex items-center justify-center mb-3">
+                <!-- Injected plate art -->
+              </div>
+              <h2 id="modalTitle" class="text-xl font-extrabold text-[#1E1E1E]">Mini Cookies Cup</h2>
+              <p id="modalDesc" class="text-xs text-gray-400 mt-1 max-w-[280px] leading-relaxed">
+                Crisp-edged mini cookies served in a convenient cup for easy snacking.
+              </p>
+            </div>
+          </div>
+
+          <!-- Quantity + Add to Order Footer -->
+          <div class="pt-4 mt-4 border-t border-gray-100 flex items-center gap-2">
+            <div class="flex items-center bg-[#F4F5F7] rounded-full p-1 shrink-0">
+              <button id="modalQtyMinus" type="button" class="w-7 h-7 rounded-full bg-white shadow-2xs flex items-center justify-center font-bold text-sm text-[#1E1E1E] active:scale-90 transition cursor-pointer">−</button>
+              <span id="modalQtyValue" class="w-6 text-center text-xs font-bold text-[#1E1E1E] tabular-nums">1</span>
+              <button id="modalQtyPlus" type="button" class="w-7 h-7 rounded-full bg-white shadow-2xs flex items-center justify-center font-bold text-sm text-[#1E1E1E] active:scale-90 transition cursor-pointer">+</button>
+            </div>
+
+            <button
+              id="addToCartConfirmBtn"
+              type="button"
+              class="flex-1 min-w-0 bg-[#1C1C1C] hover:bg-black text-white rounded-full py-2.5 px-3.5 font-bold text-xs flex items-center justify-between gap-2 shadow-lg active:scale-[0.98] transition cursor-pointer"
+            >
+              <span class="whitespace-nowrap shrink-0 tracking-tight">Add to Order</span>
+              <span id="modalTotalPrice" class="bg-[#F6DF7B] text-[#1C1C1C] px-2.5 py-0.5 rounded-full text-[11px] font-extrabold whitespace-nowrap shrink-0 tabular-nums">EGP 70.00</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ========================================================= -->
+      <!-- INTERACTIVE CART & CHECKOUT DRAWER                        -->
+      <!-- ========================================================= -->
+      <div
+        id="cartDrawerOverlay"
+        class="hidden absolute inset-0 bg-black/45 backdrop-blur-[2px] z-30 flex items-end justify-center"
+      >
+        <div
+          id="cartDrawerSheet"
+          class="w-full bg-white rounded-t-[30px] p-6 pb-7 shadow-2xl animate-slide-up max-h-[90%] flex flex-col"
+        >
+          <!-- Drawer Header -->
+          <div class="flex items-center justify-between pb-3 border-b border-gray-100">
+            <div>
+              <h2 class="text-xl font-extrabold text-[#1E1E1E]">Your Order</h2>
+              <p id="drawerSubtitle" class="text-xs text-gray-400 font-medium">2 items selected</p>
+            </div>
+            <button
+              id="closeCartDrawerBtn"
+              type="button"
+              aria-label="Close order drawer"
+              class="w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-600 transition cursor-pointer"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          <!-- Cart Line Items List -->
+          <div id="cartItemsContainer" class="flex-1 overflow-y-auto no-scrollbar space-y-3 py-1 min-h-[140px]">
+            <!-- Cart items injected dynamically -->
+          </div>
+
+          <!-- Totals & Place Order CTA -->
+          <div id="cartSummaryFooter" class="pt-4 mt-3 border-t border-gray-100 space-y-2.5">
+            <div class="flex justify-between text-xs text-gray-500">
+              <span>Subtotal</span>
+              <span id="subtotalText" class="font-semibold text-[#1E1E1E]">EGP 100.00</span>
+            </div>
+            <div class="flex justify-between text-xs text-gray-500">
+              <span>Service &amp; Tax (8%)</span>
+              <span id="taxText" class="font-semibold text-[#1E1E1E]">EGP 8.00</span>
+            </div>
+            <div class="flex justify-between text-base font-extrabold text-[#1E1E1E] pt-1">
+              <span>Total</span>
+              <span id="grandTotalText">EGP 108.00</span>
+            </div>
+
+            <button
+              id="placeOrderBtn"
+              type="button"
+              class="w-full mt-2 bg-[#1C1C1C] hover:bg-black text-white rounded-full py-4 px-6 font-bold text-sm flex items-center justify-center gap-2.5 shadow-xl active:scale-[0.98] transition cursor-pointer"
+            >
+              <span>Place Order</span>
+              <span class="w-6 h-6 rounded-full bg-[#F6DF7B] text-[#1C1C1C] flex items-center justify-center text-xs font-extrabold">→</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ========================================================= -->
+      <!-- 4. PRE-CONFIRMATION NFC & CARD PAYMENT SCREEN             -->
+      <!-- ========================================================= -->
+      <div
+        id="nfcPaymentOverlay"
+        class="hidden absolute inset-0 bg-[#FAFAFA] z-30 flex flex-col justify-between p-5 overflow-y-auto no-scrollbar animate-slide-up"
+        aria-label="Card and NFC Bracelet Payment"
+      >
+        <!-- Top Bar: Back / Cancel -->
+        <div class="flex items-center justify-between pt-0.5 shrink-0">
+          <button
+            id="nfcCancelBtn"
+            type="button"
+            class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-white text-xs font-bold text-[#1E1E1E] border border-gray-200 shadow-2xs hover:bg-gray-100 active:scale-95 transition cursor-pointer"
+          >
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
+            </svg>
+            <span>Back to Cart</span>
+          </button>
+        </div>
+
+        <!-- Amount Due Header + Payment Method Tabs -->
+        <div class="text-center mt-3 shrink-0">
+          <p class="text-[11px] font-bold uppercase tracking-widest text-gray-400">
+            Total Amount Due
+          </p>
+          <p id="nfcAmountDue" class="text-3xl font-black tracking-tight text-[#1E1E1E] mt-0.5">
+            EGP 108.00
+          </p>
+          <p id="nfcItemSummary" class="text-xs text-gray-400 mt-0.5">
+            2 items • Debit/Credit Card or NFC Bracelet
+          </p>
+
+          <!-- Two-Tab Switcher: Tap Card / Bracelet vs Enter Card Details -->
+          <div class="mt-3.5 bg-[#ECEEF2] p-1 rounded-full grid grid-cols-2 gap-1">
+            <button
+              id="tabTapNfcBtn"
+              type="button"
+              class="py-2 px-3 rounded-full text-xs font-extrabold bg-[#1C1C1C] text-white shadow-2xs transition cursor-pointer"
+            >
+              Tap Card / Bracelet
+            </button>
+            <button
+              id="tabEnterCardBtn"
+              type="button"
+              class="py-2 px-3 rounded-full text-xs font-bold text-gray-500 hover:text-[#1E1E1E] transition cursor-pointer"
+            >
+              Enter Card Details
+            </button>
+          </div>
+        </div>
+
+        <!-- TAB 1: TAP CARD / BRACELET -->
+        <div id="tapNfcPanel" class="flex-1 flex flex-col justify-between py-2">
+          <div class="flex flex-col items-center text-center my-auto py-2">
+            <!-- Animated NFC Reader + Card & Wristband Visual -->
+            <div class="relative w-48 h-40 my-3 flex items-center justify-center">
+              <span
+                class="nfc-wave-1 absolute w-28 h-28 rounded-full border-2 border-[#93B042]/55 pointer-events-none"
+              ></span>
+              <span
+                class="nfc-wave-2 absolute w-28 h-28 rounded-full border-2 border-[#F6DF7B] pointer-events-none"
+              ></span>
+
+              <!-- Kiosk NFC Pad Base -->
+              <div class="w-[104px] h-[104px] rounded-[26px] bg-[#1C1C1C] shadow-xl flex flex-col items-center justify-center relative border border-white/10">
+                <svg class="w-9 h-9 text-[#93B042]" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M8.5 14.5a5 5 0 010-5m3.5 7.5a9 9 0 010-10m3.5 12.5a13 13 0 010-15" />
+                </svg>
+                <span class="text-[9px] font-extrabold uppercase tracking-wider text-white/85 mt-1">NFC READER</span>
+              </div>
+
+              <!-- Hovering Contactless Card Graphic -->
+              <div
+                id="nfcCardGraphic"
+                class="nfc-card-hover absolute -top-1 right-0 w-[88px] h-14 rounded-2xl bg-[#F4F3EC] border-2 border-[#1C1C1C] shadow-lg p-2 flex flex-col justify-between pointer-events-none"
+              >
+                <div class="flex items-center justify-between">
+                  <span class="w-4 h-3 rounded-xs bg-[#F6DF7B] border border-[#1C1C1C]/30"></span>
+                  <span class="w-2 h-2 rounded-full bg-[#93B042]"></span>
+                </div>
+                <div class="flex items-center justify-between">
+                  <span class="w-8 h-1.5 rounded-full bg-[#1C1C1C]/20"></span>
+                  <span class="text-[8px] font-black text-[#1C1C1C]">CARD</span>
+                </div>
+              </div>
+
+              <!-- NFC Wristband / Bracelet Graphic -->
+              <div
+                id="nfcBraceletGraphic"
+                class="nfc-card-hover absolute -bottom-1 left-0 px-2.5 py-1.5 rounded-full bg-[#93B042] border-2 border-[#1C1C1C] shadow-lg flex items-center gap-1.5 pointer-events-none"
+              >
+                <span class="w-2.5 h-2.5 rounded-full bg-[#1C1C1C]"></span>
+                <span class="text-[8px] font-black uppercase tracking-wider text-[#121212]">NFC BAND</span>
+              </div>
+            </div>
+
+            <!-- Status Heading & Helper Copy -->
+            <h2 id="nfcStatusTitle" class="text-lg font-extrabold text-[#1E1E1E]">
+              Tap Debit/Credit Card or NFC Bracelet
+            </h2>
+            <p id="nfcStatusSubtitle" class="text-xs text-gray-400 mt-1 max-w-[285px] leading-relaxed">
+              Hold your contactless card, mobile wallet, or prepaid NFC wristband near the reader to pay before order confirmation.
+            </p>
+
+            <!-- Insufficient Balance / Error Alert Banner -->
+            <div
+              id="nfcAlertBanner"
+              class="hidden w-full mt-2.5 px-3.5 py-2.5 rounded-2xl bg-red-50 border border-red-200 text-left"
+              role="alert"
+            >
+              <p id="nfcAlertTitle" class="text-xs font-extrabold text-red-700">Insufficient Bracelet Balance</p>
+              <p id="nfcAlertDetail" class="text-[11px] text-red-600 mt-0.5 leading-snug"></p>
+            </div>
+
+            <!-- Web NFC Hardware Status Note -->
+            <p id="nfcHardwareHint" class="text-[11px] font-medium text-[#7B9632] mt-2 min-h-[16px]"></p>
+          </div>
+
+          <!-- Dual Simulation / Test Buttons + Cancel -->
+          <div class="space-y-2 pt-1 shrink-0">
+            <button
+              id="simulateCardTapBtn"
+              type="button"
+              class="w-full bg-[#1C1C1C] hover:bg-black active:scale-[0.98] text-white rounded-full py-3.5 px-5 font-extrabold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-md transition cursor-pointer"
+            >
+              <svg class="w-4 h-4 text-[#F6DF7B]" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+                <rect x="2" y="5" width="20" height="14" rx="3" />
+                <path d="M2 10h20" />
+              </svg>
+              <span id="simulateCardBtnLabel">Simulate Card Tap</span>
+            </button>
+
+            <button
+              id="simulateBraceletTapBtn"
+              type="button"
+              class="w-full bg-[#93B042] hover:brightness-105 active:scale-[0.98] text-[#121212] rounded-full py-3.5 px-5 font-extrabold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-md transition cursor-pointer"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M8.5 14.5a5 5 0 010-5m3.5 7.5a9 9 0 010-10m3.5 12.5a13 13 0 010-15" />
+              </svg>
+              <span id="simulateBraceletBtnLabel">Simulate Bracelet Tap (EGP 2,500.00)</span>
+            </button>
+
+            <button
+              id="nfcCancelSecondaryBtn"
+              type="button"
+              class="w-full py-1.5 text-xs font-bold text-gray-400 hover:text-[#1E1E1E] transition cursor-pointer"
+            >
+              Cancel &amp; Return to Order
+            </button>
+          </div>
+        </div>
+
+        <!-- TAB 2: ENTER CARD DETAILS FORM -->
+        <form id="enterCardPanel" class="hidden flex-1 flex flex-col justify-between py-2" novalidate>
+          <div class="space-y-3 my-auto">
+            <div>
+              <label for="cardHolderInput" class="block text-[11px] font-bold uppercase tracking-wider text-gray-400 mb-1">
+                Cardholder Name
+              </label>
+              <input
+                id="cardHolderInput"
+                type="text"
+                placeholder="Alex Morgan"
+                autocomplete="cc-name"
+                class="w-full px-3.5 py-2.5 rounded-2xl bg-white border border-gray-200 text-sm font-semibold text-[#1E1E1E] focus:outline-none focus:border-[#1C1C1C]"
+              />
+            </div>
+
+            <div>
+              <label for="cardNumberInput" class="block text-[11px] font-bold uppercase tracking-wider text-gray-400 mb-1">
+                Debit / Credit Card Number
+              </label>
+              <input
+                id="cardNumberInput"
+                type="text"
+                inputmode="numeric"
+                maxlength="19"
+                placeholder="4532 •••• •••• 1234"
+                autocomplete="cc-number"
+                class="w-full px-3.5 py-2.5 rounded-2xl bg-white border border-gray-200 text-sm font-semibold text-[#1E1E1E] tracking-wider focus:outline-none focus:border-[#1C1C1C]"
+              />
+            </div>
+
+            <div class="grid grid-cols-2 gap-2.5">
+              <div>
+                <label for="cardExpiryInput" class="block text-[11px] font-bold uppercase tracking-wider text-gray-400 mb-1">
+                  Expiry (MM/YY)
+                </label>
+                <input
+                  id="cardExpiryInput"
+                  type="text"
+                  inputmode="numeric"
+                  maxlength="5"
+                  placeholder="08/28"
+                  autocomplete="cc-exp"
+                  class="w-full px-3.5 py-2.5 rounded-2xl bg-white border border-gray-200 text-sm font-semibold text-[#1E1E1E] focus:outline-none focus:border-[#1C1C1C]"
+                />
+              </div>
+              <div>
+                <label for="cardCvvInput" class="block text-[11px] font-bold uppercase tracking-wider text-gray-400 mb-1">
+                  CVV
+                </label>
+                <input
+                  id="cardCvvInput"
+                  type="password"
+                  inputmode="numeric"
+                  maxlength="4"
+                  placeholder="•••"
+                  autocomplete="cc-csc"
+                  class="w-full px-3.5 py-2.5 rounded-2xl bg-white border border-gray-200 text-sm font-semibold text-[#1E1E1E] focus:outline-none focus:border-[#1C1C1C]"
+                />
+              </div>
+            </div>
+
+            <p id="cardFormError" class="hidden text-xs font-bold text-red-600 pt-0.5"></p>
+          </div>
+
+          <div class="space-y-2 pt-3 shrink-0">
+            <button
+              id="submitCardPaymentBtn"
+              type="submit"
+              class="w-full bg-[#1C1C1C] hover:bg-black active:scale-[0.98] text-white rounded-full py-3.5 px-6 font-extrabold text-sm flex items-center justify-center gap-2 shadow-lg transition cursor-pointer"
+            >
+              <span id="submitCardBtnLabel">Pay Now</span>
+              <span class="w-6 h-6 rounded-full bg-[#F6DF7B] text-[#1C1C1C] flex items-center justify-center text-xs font-extrabold">→</span>
+            </button>
+
+            <button
+              id="cardCancelSecondaryBtn"
+              type="button"
+              class="w-full py-1.5 text-xs font-bold text-gray-400 hover:text-[#1E1E1E] transition cursor-pointer"
+            >
+              Cancel &amp; Return to Order
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <!-- ========================================================= -->
+      <!-- 5. ORDER TICKET CONFIRMATION SCREEN                       -->
+      <!-- ========================================================= -->
+      <div
+        id="orderSuccessOverlay"
+        class="hidden absolute inset-0 bg-[#FAFAFA] z-35 flex flex-col items-center justify-center p-7 text-center animate-slide-up"
+      >
+        <div class="w-20 h-20 rounded-full bg-[#F6DF7B] flex items-center justify-center shadow-md mb-5">
+          <svg class="w-10 h-10 text-[#1C1C1C]" fill="none" stroke="currentColor" stroke-width="2.6" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+          </svg>
+        </div>
+
+        <h2 class="text-2xl font-extrabold text-[#1E1E1E] mt-1">Order Confirmed!</h2>
+        <p id="ticketPaymentSubtitle" class="text-xs text-gray-400 mt-1 max-w-[270px]">
+          Payment verified. Your freshly prepared dishes are being sent to the kitchen now.
+        </p>
+
+        <!-- Receipt Ticket Card -->
+        <div class="w-full bg-white rounded-[24px] p-5 mt-6 shadow-sm border border-gray-100">
+          <p class="text-[11px] font-bold uppercase tracking-wider text-gray-400">Order Ticket Number</p>
+          <p id="ticketNumberDisplay" class="text-4xl font-extrabold tracking-tight text-[#1E1E1E] mt-1">#A-408</p>
+          <div class="my-4 border-t border-dashed border-gray-200"></div>
+          <div class="flex justify-between text-xs text-gray-500">
+            <span>Payment Method</span>
+            <span id="ticketPaymentMethod" class="font-bold text-[#1E1E1E]">Contactless Card</span>
+          </div>
+          <div id="ticketRemainingBalanceRow" class="hidden flex justify-between text-xs text-gray-500 mt-2">
+            <span>Remaining Balance</span>
+            <span id="ticketRemainingBalance" class="font-bold text-[#7B9632]">EGP 1,722.40</span>
+          </div>
+          <div class="flex justify-between text-xs text-gray-500 mt-2">
+            <span>Amount Paid</span>
+            <span id="ticketPaidAmount" class="font-bold text-[#1E1E1E]">EGP 108.00</span>
+          </div>
+        </div>
+
+        <button
+          id="startNewOrderBtn"
+          type="button"
+          class="mt-7 w-full bg-[#1C1C1C] hover:bg-black text-white rounded-full py-3.5 px-6 font-bold text-sm shadow-lg active:scale-95 transition cursor-pointer"
+        >
+          Start New Order
+        </button>
+      </div>
+
+    </main>
+
+    <!-- Bottom Kiosk Home Indicator Bar -->
+    <div class="hidden sm:flex items-center justify-center pt-2.5 pb-0.5 shrink-0">
+      <div class="w-28 h-1 bg-[#323238] rounded-full"></div>
+    </div>
+  </div>
+
+  <script>
+    /**
+     * Formats numeric amounts consistently as "EGP 1,250.00".
+     */
+    function formatEGP(amount) {
+      const numeric = Number(amount);
+      const safeValue = Number.isFinite(numeric) ? numeric : 0;
+      return `EGP ${safeValue.toLocaleString("en-US", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      })}`;
+    }
+
+    /**
+     * Circular food photography catalog with fallback URLs for every item.
+     */
+    const FOOD_PHOTOS = {
+      dessert_cookies_cup: {
+        src: "https://www.grebesbakery.com/wp-content/uploads/2024/05/photo-cookies-mini-chocolate-chip-cup.jpg",
+        fallback: "https://i5.walmartimages.com/asr/e47f5c89-259b-4179-8a07-22eb74d13adc.4b04bb7b3bb35eb793a0882ee0637318.jpeg",
+        alt: "Mini Cookies Cup"
+      },
+      dessert_brownies_cup: {
+        src: "https://thebakermama.com/wp-content/uploads/2023/02/IMG_0412.jpeg",
+        alt: "Mini Brownies Cup"
+      },
+      dessert_square_brownie: {
+        src: "https://sallysbakingaddiction.com/wp-content/uploads/2016/12/homemade-brownies.jpg",
+        alt: "Square Brownies"
+      },
+      dessert_choc_chip_cookie: {
+        src: "https://food.fnr.sndimg.com/content/dam/images/food/fullset/2006/12/11/0/12Days_Chocolate_Chip_Cooki.jpg.rend.hgtvcom.1280.1280.suffix/1391394585748.webp",
+        alt: "Chocolate Chip Cookies"
+      },
+      dessert_popcorn: {
+        src: "https://mapleandthyme.com/wp-content/uploads/2019/02/bowl-of-maple-sea-salt-popcorn-on-gray-wood.jpg",
+        alt: "Popcorn"
+      },
+      sandwich_panini: {
+        src: "http://www.pamperedchef.ca/iceberg/com/recipe/1828355-lg.jpg",
+        alt: "Chicken Panini"
+      },
+      sandwich_bagel: {
+        src: "https://www.superhealthykids.com/wp-content/uploads/2018/09/turkey-bagel-sandwich-featured-image-square-2.jpg",
+        fallback: "https://www.momables.com/wp-content/uploads/2023/07/Turkey-bagel-sandwich_post_02.jpg",
+        alt: "Turkey Bagel"
+      },
+      sandwich_tuna_fina: {
+        src: "https://www.recipetineats.com/tachyon/2023/08/Tuna-sandwich_2.jpg",
+        alt: "Tuna Fina White"
+      },
+      sandwich_roast_beef_fina: {
+        src: "https://www.goodlifeeats.com/wp-content/uploads/2025/11/the-best-hot-roast-beef-sandwiches.jpg",
+        alt: "Roast Beef Fina White"
+      },
+      drink_strawberry_mix: {
+        src: "https://www.radacutlery.com/wp-content/uploads/2014/09/Strawberry-Cream-Smoothie-1-1024x675.jpg",
+        alt: "Strawberry Mix"
+      },
+      drink_chocolate_mix: {
+        src: "https://media.istockphoto.com/id/821034724/photo/cold-refreshing-iced-hot-chocolate-milk.jpg?s=612x612&w=0&k=20&c=NKiAWAYuNh-5KpLZ1ueSoTDeP4_nOcIRPScV068Hso4=",
+        alt: "Chocolate Mix"
+      },
+      drink_banana_mix: {
+        src: "https://bakewithshivesh.com/wp-content/uploads/2022/02/IMG-5486-scaled.jpg",
+        alt: "Banana Mix"
+      },
+      drink_cocktail_juice: {
+        src: "https://gourmetegypt.com/media/catalog/product/j/u/juhayna_pure_cocktail_juice_.jpg?optimize=high&bg-color=255,255,255&fit=bounds&height=&width=",
+        alt: "Juhayna Cocktail"
+      },
+      drink_orange_juice: {
+        src: "https://assets.kenzz.com/products/399455/001_G20524.jpeg",
+        alt: "Juhayna Orange"
+      },
+      drink_guava_juice: {
+        src: "https://cdn.mafrservices.com/sys-master-root/h14/h75/48674461024286/433832_main.jpg?im=Resize=376",
+        alt: "Juhayna Guava"
+      },
+      drink_water: {
+        src: "https://media.istockphoto.com/id/494501198/photo/buying-bottle-of-water.jpg?s=612x612&w=0&k=20&c=Cxut2vABifKlzXCRXH5o37gXBXRE5fcA4yve2IwjRgs=",
+        alt: "Mineral Water"
+      },
+      break_fries: {
+        src: "https://www.recipetineats.com/tachyon/2022/09/Crispy-Fries_8.jpg",
+        alt: "Fries"
+      },
+      break_strips_meal: {
+        src: "https://blog.suvie.com/wp-content/uploads/2024/09/chicken-tenders-fries-ketchup.jpg",
+        alt: "Chicken Strips & Fries Meal"
+      }
+    };
+
+    function createPlatePhoto(variant) {
+      const entry = FOOD_PHOTOS[variant] || FOOD_PHOTOS.dessert_cookies_cup;
+      const fallbackUrl = entry.fallback || `https://placehold.co/320x320/F4F5F7/1E1E1E?text=${encodeURIComponent(entry.alt)}`;
+      const finalFallback = `https://placehold.co/320x320/F4F5F7/1E1E1E?text=${encodeURIComponent(entry.alt)}`;
+      return `
+        <img
+          src="${entry.src}"
+          alt="${entry.alt}"
+          loading="lazy"
+          onerror="this.onerror=function(){this.onerror=null;this.src='${finalFallback}';};this.src='${fallbackUrl}';"
+          class="w-full h-full object-cover object-center rounded-full"
+        />
+      `;
+    }
+
+    /**
+     * Complete Kiosk Catalog with exact names, categories, and EGP prices
+     */
+    const MENU_ITEMS = [
+      {
+        id: 1,
+        title: "Mini Cookies Cup",
+        subtitle: "Bite-sized baked cookie cup",
+        description: "Crisp-edged mini cookies served in a convenient cup for easy snacking.",
+        price: 70.00,
+        calories: 185,
+        category: "Desserts",
+        visual: "dessert_cookies_cup"
+      },
+      {
+        id: 2,
+        title: "Mini Brownies Cup",
+        subtitle: "Rich cocoa brownie bites",
+        description: "Fudgy bite-sized chocolate brownies packed into a warm snack cup.",
+        price: 75.00,
+        calories: 210,
+        category: "Desserts",
+        visual: "dessert_brownies_cup"
+      },
+      {
+        id: 3,
+        title: "Square Brownies",
+        subtitle: "Classic baked chocolate square",
+        description: "Dense, rich chocolate brownie square with a soft fudge center.",
+        price: 55.00,
+        calories: 165,
+        category: "Desserts",
+        visual: "dessert_square_brownie"
+      },
+      {
+        id: 4,
+        title: "Chocolate Chip Cookies",
+        subtitle: "Golden baked choc-chip cookie",
+        description: "Freshly baked golden cookie loaded with semi-sweet chocolate chips.",
+        price: 40.00,
+        calories: 140,
+        category: "Desserts",
+        visual: "dessert_choc_chip_cookie"
+      },
+      {
+        id: 5,
+        title: "Popcorn",
+        subtitle: "Lightly salted freshly popped",
+        description: "Light, airy popped corn seasoned just right for a quick crunch.",
+        price: 60.00,
+        calories: 110,
+        category: "Desserts",
+        visual: "dessert_popcorn"
+      },
+      {
+        id: 6,
+        title: "Chicken Panini",
+        subtitle: "Toasted grilled chicken sandwich",
+        description: "Pressed artisan panini bread filled with seasoned chicken and savory melted cheese.",
+        price: 175.00,
+        calories: 390,
+        category: "Sandwiches",
+        visual: "sandwich_panini"
+      },
+      {
+        id: 7,
+        title: "Turkey Bagel",
+        subtitle: "Savory turkey on toasted bagel",
+        description: "Sliced roasted turkey layered inside a freshly toasted sesame bagel with crisp greens.",
+        price: 160.00,
+        calories: 340,
+        category: "Sandwiches",
+        visual: "sandwich_bagel"
+      },
+      {
+        id: 8,
+        title: "Tuna Fina White",
+        subtitle: "Creamy tuna in soft fina bread",
+        description: "Classic seasoned tuna salad tucked into soft white fina bread.",
+        price: 95.00,
+        calories: 265,
+        category: "Sandwiches",
+        visual: "sandwich_tuna_fina"
+      },
+      {
+        id: 9,
+        title: "Roast Beef Fina White",
+        subtitle: "Tender roast beef in fina bread",
+        description: "Thinly sliced tender roast beef served in soft white fina bread.",
+        price: 160.00,
+        calories: 330,
+        category: "Sandwiches",
+        visual: "sandwich_roast_beef_fina"
+      },
+      {
+        id: 10,
+        title: "Strawberry Mix",
+        subtitle: "Chilled berry drink blend",
+        description: "Refreshing chilled strawberry blend served cold.",
+        price: 35.00,
+        calories: 85,
+        category: "Drinks",
+        visual: "drink_strawberry_mix"
+      },
+      {
+        id: 11,
+        title: "Chocolate Mix",
+        subtitle: "Chilled cocoa drink blend",
+        description: "Smooth chilled chocolate drink blend served cold.",
+        price: 35.00,
+        calories: 95,
+        category: "Drinks",
+        visual: "drink_chocolate_mix"
+      },
+      {
+        id: 12,
+        title: "Banana Mix",
+        subtitle: "Chilled banana drink blend",
+        description: "Creamy chilled banana blend served cold.",
+        price: 35.00,
+        calories: 90,
+        category: "Drinks",
+        visual: "drink_banana_mix"
+      },
+      {
+        id: 13,
+        title: "Juhayna Cocktail",
+        subtitle: "Mixed fruit juice pack",
+        description: "Chilled Juhayna mixed fruit cocktail juice.",
+        price: 30.00,
+        calories: 75,
+        category: "Drinks",
+        visual: "drink_cocktail_juice"
+      },
+      {
+        id: 14,
+        title: "Juhayna Orange",
+        subtitle: "Classic orange juice pack",
+        description: "Chilled Juhayna orange juice served refreshing and cold.",
+        price: 30.00,
+        calories: 70,
+        category: "Drinks",
+        visual: "drink_orange_juice"
+      },
+      {
+        id: 15,
+        title: "Juhayna Guava",
+        subtitle: "Sweet guava juice pack",
+        description: "Chilled Juhayna guava nectar served refreshing and cold.",
+        price: 30.00,
+        calories: 80,
+        category: "Drinks",
+        visual: "drink_guava_juice"
+      },
+      {
+        id: 16,
+        title: "Mineral Water",
+        subtitle: "Crisp still bottled water",
+        description: "Pure, crisp bottled mineral water served chilled.",
+        price: 10.00,
+        calories: 0,
+        category: "Drinks",
+        visual: "drink_water"
+      },
+      {
+        id: 17,
+        title: "Fries",
+        subtitle: "Main Break • 12:00 PM – 1:00 PM",
+        description: "Golden crispy french fries served hot for Main Break (12:00 PM – 1:00 PM).",
+        price: 65.00,
+        calories: 240,
+        category: "Main Break",
+        visual: "break_fries"
+      },
+      {
+        id: 18,
+        title: "Chicken Strips & Fries Meal",
+        subtitle: "Main Break • 12:00 PM – 1:00 PM",
+        description: "Crispy breaded chicken strips paired with golden fries for Main Break (12:00 PM – 1:00 PM).",
+        price: 130.00,
+        calories: 460,
+        category: "Main Break",
+        visual: "break_strips_meal"
+      }
+    ];
+
+    // =========================================================================
+    // APPLICATION STATE
+    // =========================================================================
+    const state = {
+      searchQuery: "",
+      activeCategory: "All",
+      cart: [
+        {
+          uid: "1-Regular-",
+          itemId: 1,
+          title: "Mini Cookies Cup",
+          size: "Regular",
+          addons: [],
+          unitPrice: 70.00,
+          qty: 1,
+          visual: "dessert_cookies_cup"
+        },
+        {
+          uid: "14-Regular-",
+          itemId: 14,
+          title: "Juhayna Orange",
+          size: "Regular",
+          addons: [],
+          unitPrice: 30.00,
+          qty: 1,
+          visual: "drink_orange_juice"
+        }
+      ],
+      selectedModalItem: null,
+      modalSize: "Regular",
+      modalSizeExtra: 0,
+      modalQty: 1,
+      pendingOrderTotal: formatEGP(0),
+      pendingOrderAmountNum: 0,
+      activePaymentTab: "tap",
+      isProcessingNfc: false,
+      nfcTimerId: null,
+      nfcAbortController: null,
+      simulatedBraceletBalance: 2500.00,
+      completedPaymentMethod: "Contactless Card",
+      completedRemainingBalance: null
+    };
+
+    const CATEGORIES = ["All", "Desserts", "Sandwiches", "Drinks", "Main Break"];
+
+    // Attract / Welcome Screen DOM References
+    const attractScreen = document.getElementById("attract-screen");
+    const touchToStartBtn = document.getElementById("touchToStartBtn");
+    const customHeroUploadBtn = document.getElementById("customHeroUploadBtn");
+    const customHeroFileInput = document.getElementById("customHeroFileInput");
+    const attractHeroImage = document.getElementById("attractHeroImage");
+    const backToWelcomeBtn = document.getElementById("backToWelcomeBtn");
+
+    // Core Screen, Header, Search, Grid & Cart DOM References
+    const searchInput = document.getElementById("searchInput");
+    const clearSearchBtn = document.getElementById("clearSearchBtn");
+    const resultsHeading = document.getElementById("resultsHeading");
+    const categoryBar = document.getElementById("categoryBar");
+    const productGrid = document.getElementById("productGrid");
+    const emptyState = document.getElementById("emptyState");
+    const resetFiltersBtn = document.getElementById("resetFiltersBtn");
+    const floatingCartBtn = document.getElementById("floatingCartBtn");
+    const cartDot = document.getElementById("cartDot");
+    const floatingCartLabel = document.getElementById("floatingCartLabel");
+
+    // Item Customization Modal DOM References
+    const itemModalOverlay = document.getElementById("itemModalOverlay");
+    const closeItemModalBtn = document.getElementById("closeItemModalBtn");
+    const modalCalories = document.getElementById("modalCalories");
+    const modalPlateVisual = document.getElementById("modalPlateVisual");
+    const modalTitle = document.getElementById("modalTitle");
+    const modalDesc = document.getElementById("modalDesc");
+    const modalQtyMinus = document.getElementById("modalQtyMinus");
+    const modalQtyValue = document.getElementById("modalQtyValue");
+    const modalQtyPlus = document.getElementById("modalQtyPlus");
+    const addToCartConfirmBtn = document.getElementById("addToCartConfirmBtn");
+    const modalTotalPrice = document.getElementById("modalTotalPrice");
+
+    // Cart Drawer DOM References
+    const cartDrawerOverlay = document.getElementById("cartDrawerOverlay");
+    const drawerSubtitle = document.getElementById("drawerSubtitle");
+    const closeCartDrawerBtn = document.getElementById("closeCartDrawerBtn");
+    const cartItemsContainer = document.getElementById("cartItemsContainer");
+    const cartSummaryFooter = document.getElementById("cartSummaryFooter");
+    const subtotalText = document.getElementById("subtotalText");
+    const taxText = document.getElementById("taxText");
+    const grandTotalText = document.getElementById("grandTotalText");
+    const placeOrderBtn = document.getElementById("placeOrderBtn");
+
+    // Pre-Confirmation NFC & Card Payment DOM References
+    const nfcPaymentOverlay = document.getElementById("nfcPaymentOverlay");
+    const nfcCancelBtn = document.getElementById("nfcCancelBtn");
+    const nfcAmountDue = document.getElementById("nfcAmountDue");
+    const nfcItemSummary = document.getElementById("nfcItemSummary");
+    const nfcCancelSecondaryBtn = document.getElementById("nfcCancelSecondaryBtn");
+    const cardCancelSecondaryBtn = document.getElementById("cardCancelSecondaryBtn");
+
+    const tabTapNfcBtn = document.getElementById("tabTapNfcBtn");
+    const tabEnterCardBtn = document.getElementById("tabEnterCardBtn");
+    const tapNfcPanel = document.getElementById("tapNfcPanel");
+    const enterCardPanel = document.getElementById("enterCardPanel");
+    const nfcCardGraphic = document.getElementById("nfcCardGraphic");
+    const nfcBraceletGraphic = document.getElementById("nfcBraceletGraphic");
+    const nfcStatusTitle = document.getElementById("nfcStatusTitle");
+    const nfcStatusSubtitle = document.getElementById("nfcStatusSubtitle");
+    const nfcAlertBanner = document.getElementById("nfcAlertBanner");
+    const nfcAlertTitle = document.getElementById("nfcAlertTitle");
+    const nfcAlertDetail = document.getElementById("nfcAlertDetail");
+    const nfcHardwareHint = document.getElementById("nfcHardwareHint");
+    const simulateCardTapBtn = document.getElementById("simulateCardTapBtn");
+    const simulateCardBtnLabel = document.getElementById("simulateCardBtnLabel");
+    const simulateBraceletTapBtn = document.getElementById("simulateBraceletTapBtn");
+    const simulateBraceletBtnLabel = document.getElementById("simulateBraceletBtnLabel");
+
+    // Manual Card Entry Form DOM
+    const cardHolderInput = document.getElementById("cardHolderInput");
+    const cardNumberInput = document.getElementById("cardNumberInput");
+    const cardExpiryInput = document.getElementById("cardExpiryInput");
+    const cardCvvInput = document.getElementById("cardCvvInput");
+    const cardFormError = document.getElementById("cardFormError");
+    const submitCardPaymentBtn = document.getElementById("submitCardPaymentBtn");
+    const submitCardBtnLabel = document.getElementById("submitCardBtnLabel");
+
+    // Order Confirmation Ticket DOM
+    const orderSuccessOverlay = document.getElementById("orderSuccessOverlay");
+    const ticketPaymentSubtitle = document.getElementById("ticketPaymentSubtitle");
+    const ticketNumberDisplay = document.getElementById("ticketNumberDisplay");
+    const ticketPaymentMethod = document.getElementById("ticketPaymentMethod");
+    const ticketRemainingBalanceRow = document.getElementById("ticketRemainingBalanceRow");
+    const ticketRemainingBalance = document.getElementById("ticketRemainingBalance");
+    const ticketPaidAmount = document.getElementById("ticketPaidAmount");
+    const startNewOrderBtn = document.getElementById("startNewOrderBtn");
+
+    // =========================================================================
+    // ATTRACT SCREEN CONTROLS
+    // =========================================================================
+    function hideAttractScreen() {
+      attractScreen.classList.add("attract-hidden");
+    }
+
+    function showAttractScreen() {
+      stopRealNfcScan();
+      resetNfcVisualState();
+      itemModalOverlay.classList.add("hidden");
+      cartDrawerOverlay.classList.add("hidden");
+      nfcPaymentOverlay.classList.add("hidden");
+      orderSuccessOverlay.classList.add("hidden");
+      attractScreen.classList.remove("attract-hidden");
+    }
+
+    touchToStartBtn.addEventListener("click", hideAttractScreen);
+    backToWelcomeBtn.addEventListener("click", showAttractScreen);
+
+    // Optional one-tap custom photo loader for the attract screen hero meal
+    if (customHeroUploadBtn && customHeroFileInput && attractHeroImage) {
+      customHeroUploadBtn.addEventListener("click", () => {
+        customHeroFileInput.click();
+      });
+
+      customHeroFileInput.addEventListener("change", e => {
+        const file = e.target.files && e.target.files[0];
+        if (!file) return;
+        const objectUrl = URL.createObjectURL(file);
+        attractHeroImage.src = objectUrl;
+      });
+    }
+
+    // =========================================================================
+    // MENU, CUSTOMIZATION & CART RENDERING
+    // =========================================================================
+    function renderCategories() {
+      categoryBar.innerHTML = CATEGORIES.map(cat => {
+        const isActive = state.activeCategory === cat;
+        return `
+          <button
+            type="button"
+            data-category="${cat}"
+            class="cat-pill px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+              isActive
+                ? "bg-[#1C1C1C] text-white shadow-2xs"
+                : "bg-white text-gray-500 hover:text-[#1E1E1E] border border-gray-100"
+            }"
+          >
+            ${cat}
+          </button>
+        `;
+      }).join("");
+
+      document.querySelectorAll(".cat-pill").forEach(btn => {
+        btn.addEventListener("click", () => {
+          state.activeCategory = btn.dataset.category;
+          renderCategories();
+          renderProducts();
+        });
+      });
+    }
+
+    function getFilteredItems() {
+      const q = state.searchQuery.trim().toLowerCase();
+      return MENU_ITEMS.filter(item => {
+        const matchesCat = state.activeCategory === "All" || item.category === state.activeCategory;
+        const matchesQuery =
+          !q ||
+          item.title.toLowerCase().includes(q) ||
+          item.subtitle.toLowerCase().includes(q) ||
+          item.category.toLowerCase().includes(q);
+        return matchesCat && matchesQuery;
+      });
+    }
+
+    function renderProducts() {
+      const items = getFilteredItems();
+      resultsHeading.textContent = `Food ${items.length} Results`;
+
+      if (items.length === 0) {
+        productGrid.classList.add("hidden");
+        emptyState.classList.remove("hidden");
+        emptyState.classList.add("flex");
+        return;
+      }
+
+      emptyState.classList.add("hidden");
+      emptyState.classList.remove("flex");
+      productGrid.classList.remove("hidden");
+
+      productGrid.innerHTML = items.map(item => `
+        <article
+          data-id="${item.id}"
+          class="food-card bg-white rounded-[22px] p-4 flex flex-col justify-between cursor-pointer relative"
+        >
+          <!-- Top-left Flame Icon + Calories -->
+          <div class="flex items-center gap-1.5 text-[11px] font-medium text-gray-400">
+            <svg class="w-3.5 h-3.5 text-[#FF7A2F] shrink-0" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M13.5 2.2c.4 2.7-.7 4.7-2.2 6.3-1.4 1.5-2.6 2.9-2.2 5.1.3 1.5 1.5 2.6 3 2.8 2 .3 3.9-1.2 4.1-3.3.1-1.3-.3-2.5-.9-3.6 2.5 1.1 4.2 3.7 4 6.7-.3 3.7-3.5 6.6-7.3 6.6-4.1 0-7.4-3.3-7.4-7.4 0-3.4 2.1-6.1 4.5-8.5 1.6-1.6 3.2-3.2 4.4-4.7z"/>
+            </svg>
+            <span>${item.calories} Calories</span>
+          </div>
+
+          <!-- Center Circular Plate Art -->
+          <div class="my-3.5 mx-auto w-[116px] h-[116px] sm:w-[124px] sm:h-[124px] rounded-full plate-shadow bg-white flex items-center justify-center overflow-hidden">
+            ${createPlatePhoto(item.visual)}
+          </div>
+
+          <!-- Bottom Title, Subtitle, Price & Chevron Button -->
+          <div class="mt-1">
+            <h3 class="text-[15px] font-bold text-[#1E1E1E] leading-snug truncate">
+              ${item.title}
+            </h3>
+            <p class="text-[11px] text-gray-400 truncate mt-0.5">
+              ${item.subtitle}
+            </p>
+
+            <div class="mt-3 flex items-center justify-between">
+              <span class="text-[15px] font-extrabold text-[#1E1E1E]">
+                ${formatEGP(item.price)}
+              </span>
+
+              <span
+                aria-hidden="true"
+                class="w-7 h-7 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-400 hover:text-[#1E1E1E] transition"
+              >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+                </svg>
+              </span>
+            </div>
+          </div>
+        </article>
+      `).join("");
+
+      document.querySelectorAll(".food-card").forEach(card => {
+        card.addEventListener("click", () => {
+          const itemId = Number(card.dataset.id);
+          const item = MENU_ITEMS.find(i => i.id === itemId);
+          if (item) openItemModal(item);
+        });
+      });
+    }
+
+    function updateCartPill(animate = false) {
+      const totalItems = state.cart.reduce((sum, entry) => sum + entry.qty, 0);
+      floatingCartLabel.textContent = `${totalItems} ${totalItems === 1 ? "item" : "items"}`;
+      cartDot.style.display = totalItems > 0 ? "block" : "none";
+
+      if (animate) {
+        floatingCartBtn.classList.remove("animate-pop");
+        void floatingCartBtn.offsetWidth;
+        floatingCartBtn.classList.add("animate-pop");
+      }
+    }
+
+    // =========================================================================
+    // ITEM CUSTOMIZATION MODAL LOGIC
+    // =========================================================================
+    function openItemModal(item) {
+      state.selectedModalItem = item;
+      state.modalSize = "Regular";
+      state.modalSizeExtra = 0;
+      state.modalQty = 1;
+
+      modalCalories.textContent = `${item.calories} Calories`;
+      modalPlateVisual.innerHTML = createPlatePhoto(item.visual);
+      modalTitle.textContent = item.title;
+      modalDesc.textContent = item.description;
+      modalQtyValue.textContent = "1";
+
+      recalculateModalPrice();
+      itemModalOverlay.classList.remove("hidden");
+    }
+
+    function closeItemModal() {
+      itemModalOverlay.classList.add("hidden");
+      state.selectedModalItem = null;
+    }
+
+    function recalculateModalPrice() {
+      if (!state.selectedModalItem) return;
+      const unitTotal = state.selectedModalItem.price + state.modalSizeExtra;
+      const grand = unitTotal * state.modalQty;
+      modalTotalPrice.textContent = formatEGP(grand);
+    }
+
+    modalQtyMinus.addEventListener("click", () => {
+      if (state.modalQty > 1) {
+        state.modalQty--;
+        modalQtyValue.textContent = String(state.modalQty);
+        recalculateModalPrice();
+      }
+    });
+
+    modalQtyPlus.addEventListener("click", () => {
+      if (state.modalQty < 20) {
+        state.modalQty++;
+        modalQtyValue.textContent = String(state.modalQty);
+        recalculateModalPrice();
+      }
+    });
+
+    addToCartConfirmBtn.addEventListener("click", () => {
+      if (!state.selectedModalItem) return;
+      const selectedAddons = [];
+      const unitPrice = state.selectedModalItem.price + state.modalSizeExtra;
+      const uid = `${state.selectedModalItem.id}-${state.modalSize}-`;
+
+      const existing = state.cart.find(entry => entry.uid === uid);
+      if (existing) {
+        existing.qty += state.modalQty;
+      } else {
+        state.cart.push({
+          uid,
+          itemId: state.selectedModalItem.id,
+          title: state.selectedModalItem.title,
+          size: state.modalSize,
+          addons: selectedAddons,
+          unitPrice,
+          qty: state.modalQty,
+          visual: state.selectedModalItem.visual
+        });
+      }
+
+      closeItemModal();
+      updateCartPill(true);
+    });
+
+    closeItemModalBtn.addEventListener("click", closeItemModal);
+    itemModalOverlay.addEventListener("click", e => {
+      if (e.target === itemModalOverlay) closeItemModal();
+    });
+
+    // =========================================================================
+    // CART DRAWER LOGIC
+    // =========================================================================
+    function renderCartDrawer() {
+      const totalCount = state.cart.reduce((s, i) => s + i.qty, 0);
+      drawerSubtitle.textContent = `${totalCount} ${totalCount === 1 ? "item" : "items"} selected`;
+
+      if (state.cart.length === 0) {
+        cartItemsContainer.innerHTML = `
+          <div class="py-12 text-center">
+            <p class="text-sm font-bold text-[#1E1E1E]">Your order bag is empty</p>
+            <p class="text-xs text-gray-400 mt-1">Tap any dish on the menu to add it here.</p>
+          </div>
+        `;
+        cartSummaryFooter.classList.add("opacity-40", "pointer-events-none");
+        subtotalText.textContent = formatEGP(0);
+        taxText.textContent = formatEGP(0);
+        grandTotalText.textContent = formatEGP(0);
+        return;
+      }
+
+      cartSummaryFooter.classList.remove("opacity-40", "pointer-events-none");
+
+      cartItemsContainer.innerHTML = state.cart.map((entry, index) => {
+        const metaParts = [entry.size, ...entry.addons].filter(Boolean);
+        return `
+          <div class="flex items-center gap-3 p-3 rounded-2xl bg-[#FAFAFA] border border-gray-100">
+            <div class="w-14 h-14 rounded-full bg-white shadow-2xs shrink-0 overflow-hidden p-0.5">
+              ${createPlatePhoto(entry.visual)}
+            </div>
+
+            <div class="flex-1 min-w-0">
+              <h3 class="text-sm font-bold text-[#1E1E1E] truncate">${entry.title}</h3>
+              <p class="text-[11px] text-gray-400 truncate">${metaParts.join(" • ")}</p>
+              <p class="text-xs font-extrabold text-[#1E1E1E] mt-1">${formatEGP(entry.unitPrice * entry.qty)}</p>
+            </div>
+
+            <div class="flex items-center gap-1.5 bg-white rounded-full p-1 border border-gray-100 shadow-2xs">
+              <button
+                type="button"
+                data-action="dec"
+                data-index="${index}"
+                class="cart-qty-btn w-7 h-7 rounded-full hover:bg-gray-100 flex items-center justify-center text-xs font-bold text-[#1E1E1E] cursor-pointer"
+              >
+                ${entry.qty === 1 ? "✕" : "−"}
+              </button>
+              <span class="w-5 text-center text-xs font-bold text-[#1E1E1E]">${entry.qty}</span>
+              <button
+                type="button"
+                data-action="inc"
+                data-index="${index}"
+                class="cart-qty-btn w-7 h-7 rounded-full hover:bg-gray-100 flex items-center justify-center text-xs font-bold text-[#1E1E1E] cursor-pointer"
+              >
+                +
+              </button>
+            </div>
+          </div>
+        `;
+      }).join("");
+
+      const subtotal = state.cart.reduce((sum, entry) => sum + entry.unitPrice * entry.qty, 0);
+      const tax = subtotal * 0.08;
+      const grandTotal = subtotal + tax;
+
+      subtotalText.textContent = formatEGP(subtotal);
+      taxText.textContent = formatEGP(tax);
+      grandTotalText.textContent = formatEGP(grandTotal);
+
+      document.querySelectorAll(".cart-qty-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const idx = Number(btn.dataset.index);
+          const action = btn.dataset.action;
+          if (action === "inc") {
+            state.cart[idx].qty++;
+          } else {
+            if (state.cart[idx].qty > 1) {
+              state.cart[idx].qty--;
+            } else {
+              state.cart.splice(idx, 1);
+            }
+          }
+          updateCartPill();
+          renderCartDrawer();
+        });
+      });
+    }
+
+    floatingCartBtn.addEventListener("click", () => {
+      renderCartDrawer();
+      cartDrawerOverlay.classList.remove("hidden");
+    });
+
+    closeCartDrawerBtn.addEventListener("click", () => {
+      cartDrawerOverlay.classList.add("hidden");
+    });
+
+    cartDrawerOverlay.addEventListener("click", e => {
+      if (e.target === cartDrawerOverlay) cartDrawerOverlay.classList.add("hidden");
+    });
+
+    // =========================================================================
+    // PRE-CONFIRMATION NFC & CARD PAYMENT FLOW
+    // =========================================================================
+    function stopRealNfcScan() {
+      if (state.nfcAbortController) {
+        try {
+          state.nfcAbortController.abort();
+        } catch (err) {
+          // Ignore abort errors
+        }
+        state.nfcAbortController = null;
+      }
+    }
+
+    function hideNfcAlert() {
+      nfcAlertBanner.classList.add("hidden");
+      nfcAlertTitle.textContent = "";
+      nfcAlertDetail.textContent = "";
+    }
+
+    function showNfcAlert(title, detail) {
+      nfcAlertTitle.textContent = title;
+      nfcAlertDetail.textContent = detail;
+      nfcAlertBanner.classList.remove("hidden");
+    }
+
+    function parseNfcBraceletPayload(event) {
+      const serial = event.serialNumber ? String(event.serialNumber).trim() : "";
+      let rawText = "";
+
+      if (event.message && Array.isArray(event.message.records)) {
+        const textDecoder = new TextDecoder("utf-8");
+        for (const record of event.message.records) {
+          if ((record.recordType === "text" || record.recordType === "url" || record.recordType === "mime") && record.data) {
+            try {
+              const decoded = textDecoder.decode(record.data).trim();
+              if (decoded) {
+                rawText = decoded;
+                break;
+              }
+            } catch (err) {
+              // Skip unreadable record
+            }
+          }
+        }
+      }
+
+      let id = serial ? serial.toUpperCase() : "";
+      let balance = null;
+
+      if (rawText) {
+        if (rawText.startsWith("{") && rawText.endsWith("}")) {
+          try {
+            const parsed = JSON.parse(rawText);
+            if (parsed.id || parsed.braceletId || parsed.memberId) {
+              id = String(parsed.id || parsed.braceletId || parsed.memberId).trim();
+            }
+            if (typeof parsed.balance === "number" && !Number.isNaN(parsed.balance)) {
+              balance = parsed.balance;
+            } else if (typeof parsed.balance === "string" && !Number.isNaN(parseFloat(parsed.balance))) {
+              balance = parseFloat(parsed.balance);
+            }
+          } catch (err) {
+            // Fall through to text parsing
+          }
+        }
+
+        if (balance === null && /BAL\s*[:=]\s*([0-9]+(?:\.[0-9]+)?)/i.test(rawText)) {
+          const balMatch = rawText.match(/BAL\s*[:=]\s*([0-9]+(?:\.[0-9]+)?)/i);
+          if (balMatch) {
+            balance = parseFloat(balMatch[1]);
+          }
+          const idMatch = rawText.match(/(?:BRACELET|BAND|ID)\s*[:=]\s*([A-Za-z0-9_-]+)/i);
+          if (idMatch) {
+            id = idMatch[1].trim();
+          }
+        } else if (!id) {
+          id = rawText.slice(0, 28);
+        }
+      }
+
+      if (!id) {
+        id = "TAG-01";
+      }
+
+      return { id, balance };
+    }
+
+    async function startRealNfcScan() {
+      stopRealNfcScan();
+
+      if (state.activePaymentTab !== "tap") return;
+
+      if (!("NDEFReader" in window)) {
+        nfcHardwareHint.textContent =
+          "Web NFC unavailable on this browser/device — use Tap buttons or Enter Card Details.";
+        return;
+      }
+
+      if (window.isSecureContext === false) {
+        nfcHardwareHint.textContent =
+          "Web NFC requires HTTPS — use Tap buttons or Enter Card Details.";
+        return;
+      }
+
+      const controller = new AbortController();
+      state.nfcAbortController = controller;
+      nfcHardwareHint.textContent = "Listening for NFC bracelet or card — hold near reader";
+
+      try {
+        const reader = new window.NDEFReader();
+
+        reader.onreadingerror = () => {
+          if (state.isProcessingNfc || nfcPaymentOverlay.classList.contains("hidden")) return;
+          nfcHardwareHint.textContent =
+            "Could not read NFC tag cleanly — hold steady or use Simulate buttons.";
+        };
+
+        reader.onreading = event => {
+          if (state.isProcessingNfc || nfcPaymentOverlay.classList.contains("hidden")) return;
+          const braceletData = parseNfcBraceletPayload(event);
+          handleBraceletScanResult(braceletData, false);
+        };
+
+        await reader.scan({ signal: controller.signal });
+      } catch (err) {
+        if (controller.signal.aborted || (err && err.name === "AbortError")) {
+          return;
+        }
+        if (err && err.name === "NotAllowedError") {
+          nfcHardwareHint.textContent =
+            "NFC permission blocked — use Simulate Tap or Enter Card Details.";
+        } else {
+          nfcHardwareHint.textContent =
+            "Hardware NFC inactive here — use Simulate Tap or Enter Card Details.";
+        }
+      }
+    }
+
+    function handleBraceletScanResult(braceletData, isSimulated = false) {
+      hideNfcAlert();
+      const orderTotal = state.pendingOrderAmountNum;
+
+      if (typeof braceletData.balance === "number") {
+        if (braceletData.balance < orderTotal) {
+          showNfcAlert(
+            `Insufficient Balance on Bracelet #${braceletData.id}`,
+            `Balance is ${formatEGP(braceletData.balance)}, but total due is ${formatEGP(orderTotal)}. Tap another card/bracelet or enter card details.`
+          );
+          nfcStatusTitle.textContent = "Tap Another Card or Bracelet";
+          nfcHardwareHint.textContent = `Bracelet #${braceletData.id} declined (${formatEGP(braceletData.balance)} available)`;
+          return;
+        }
+
+        const remaining = +(braceletData.balance - orderTotal).toFixed(2);
+        if (isSimulated) {
+          state.simulatedBraceletBalance = remaining;
+        }
+
+        stopRealNfcScan();
+        triggerPaymentVerification({
+          methodLabel: `NFC Bracelet #${braceletData.id}`,
+          remainingBalance: remaining,
+          statusTitle: `Reading NFC Bracelet #${braceletData.id}...`,
+          statusSubtitle: `Prepaid balance ${formatEGP(braceletData.balance)} verified. Deducting ${formatEGP(orderTotal)}.`,
+          hintText: `Remaining bracelet balance: ${formatEGP(remaining)}`
+        });
+        return;
+      }
+
+      stopRealNfcScan();
+      triggerPaymentVerification({
+        methodLabel: `NFC Bracelet #${braceletData.id}`,
+        remainingBalance: null,
+        statusTitle: `Bracelet #${braceletData.id} Verified!`,
+        statusSubtitle: `Authorizing payment of ${formatEGP(orderTotal)} before order confirmation...`,
+        hintText: `Wristband ID: ${braceletData.id}`
+      });
+    }
+
+    function setPaymentTab(tab) {
+      if (state.isProcessingNfc) return;
+      state.activePaymentTab = tab;
+      hideNfcAlert();
+      cardFormError.classList.add("hidden");
+
+      if (tab === "tap") {
+        tabTapNfcBtn.className = "py-2 px-3 rounded-full text-xs font-extrabold bg-[#1C1C1C] text-white shadow-2xs transition cursor-pointer";
+        tabEnterCardBtn.className = "py-2 px-3 rounded-full text-xs font-bold text-gray-500 hover:text-[#1E1E1E] transition cursor-pointer";
+        tapNfcPanel.classList.remove("hidden");
+        enterCardPanel.classList.add("hidden");
+        startRealNfcScan();
+      } else {
+        stopRealNfcScan();
+        tabEnterCardBtn.className = "py-2 px-3 rounded-full text-xs font-extrabold bg-[#1C1C1C] text-white shadow-2xs transition cursor-pointer";
+        tabTapNfcBtn.className = "py-2 px-3 rounded-full text-xs font-bold text-gray-500 hover:text-[#1E1E1E] transition cursor-pointer";
+        tapNfcPanel.classList.add("hidden");
+        enterCardPanel.classList.remove("hidden");
+        submitCardBtnLabel.textContent = `Pay ${state.pendingOrderTotal}`;
+      }
+    }
+
+    function resetNfcVisualState() {
+      state.isProcessingNfc = false;
+      if (state.nfcTimerId) {
+        clearTimeout(state.nfcTimerId);
+        state.nfcTimerId = null;
+      }
+
+      hideNfcAlert();
+      cardFormError.classList.add("hidden");
+
+      nfcCardGraphic.classList.remove("nfc-card-reading");
+      nfcCardGraphic.classList.add("nfc-card-hover");
+      nfcBraceletGraphic.classList.remove("nfc-card-reading");
+      nfcBraceletGraphic.classList.add("nfc-card-hover");
+
+      nfcStatusTitle.textContent = "Tap Debit/Credit Card or NFC Bracelet";
+      nfcStatusSubtitle.textContent =
+        "Hold your contactless card, mobile wallet, or prepaid NFC wristband near the reader to pay before order confirmation.";
+      simulateCardBtnLabel.textContent = "Simulate Card Tap";
+      simulateBraceletBtnLabel.textContent = `Simulate Bracelet Tap (${formatEGP(state.simulatedBraceletBalance)})`;
+      submitCardBtnLabel.textContent = `Pay ${state.pendingOrderTotal}`;
+
+      [
+        simulateCardTapBtn,
+        simulateBraceletTapBtn,
+        submitCardPaymentBtn,
+        nfcCancelBtn,
+        nfcCancelSecondaryBtn,
+        cardCancelSecondaryBtn,
+        tabTapNfcBtn,
+        tabEnterCardBtn
+      ].forEach(el => {
+        el.disabled = false;
+        el.classList.remove("opacity-60", "pointer-events-none");
+      });
+    }
+
+    function openNfcPaymentScreen() {
+      if (state.cart.length === 0) return;
+
+      const subtotal = state.cart.reduce((sum, entry) => sum + entry.unitPrice * entry.qty, 0);
+      const tax = subtotal * 0.08;
+      const grandTotal = +(subtotal + tax).toFixed(2);
+      const totalCount = state.cart.reduce((s, i) => s + i.qty, 0);
+
+      state.pendingOrderAmountNum = grandTotal;
+      state.pendingOrderTotal = formatEGP(grandTotal);
+
+      nfcAmountDue.textContent = state.pendingOrderTotal;
+      nfcItemSummary.textContent = `${totalCount} ${totalCount === 1 ? "item" : "items"} • Debit/Credit Card or NFC Bracelet`;
+
+      resetNfcVisualState();
+      cartDrawerOverlay.classList.add("hidden");
+      nfcPaymentOverlay.classList.remove("hidden");
+      setPaymentTab("tap");
+    }
+
+    function cancelNfcPayment() {
+      if (state.isProcessingNfc) return;
+      stopRealNfcScan();
+      resetNfcVisualState();
+      nfcPaymentOverlay.classList.add("hidden");
+      renderCartDrawer();
+      cartDrawerOverlay.classList.remove("hidden");
+    }
+
+    function completeNfcAndConfirmOrder() {
+      const randomNum = Math.floor(100 + Math.random() * 899);
+      ticketNumberDisplay.textContent = `#A-${randomNum}`;
+      ticketPaymentMethod.textContent = state.completedPaymentMethod;
+      ticketPaidAmount.textContent = state.pendingOrderTotal;
+
+      if (typeof state.completedRemainingBalance === "number") {
+        ticketRemainingBalance.textContent = formatEGP(state.completedRemainingBalance);
+        ticketRemainingBalanceRow.classList.remove("hidden");
+        ticketPaymentSubtitle.textContent = `${state.completedPaymentMethod} approved. Your freshly prepared dishes are being sent to the kitchen.`;
+      } else {
+        ticketRemainingBalanceRow.classList.add("hidden");
+        ticketPaymentSubtitle.textContent = `${state.completedPaymentMethod} verified. Your freshly prepared dishes are being sent to the kitchen now.`;
+      }
+
+      state.isProcessingNfc = false;
+      nfcPaymentOverlay.classList.add("hidden");
+      orderSuccessOverlay.classList.remove("hidden");
+    }
+
+    function triggerPaymentVerification({
+      methodLabel = "Contactless Card",
+      remainingBalance = null,
+      statusTitle = "Verifying Contactless Card...",
+      statusSubtitle = "Keep card or bracelet still while payment is authorized.",
+      hintText = "Payment authorization in progress..."
+    } = {}) {
+      if (state.isProcessingNfc || nfcPaymentOverlay.classList.contains("hidden")) return;
+
+      stopRealNfcScan();
+      hideNfcAlert();
+      state.isProcessingNfc = true;
+      state.completedPaymentMethod = methodLabel;
+      state.completedRemainingBalance = remainingBalance;
+
+      nfcCardGraphic.classList.remove("nfc-card-hover");
+      nfcCardGraphic.classList.add("nfc-card-reading");
+      nfcBraceletGraphic.classList.remove("nfc-card-hover");
+      nfcBraceletGraphic.classList.add("nfc-card-reading");
+
+      nfcStatusTitle.textContent = statusTitle;
+      nfcStatusSubtitle.textContent = statusSubtitle;
+      nfcHardwareHint.textContent = hintText;
+      simulateCardBtnLabel.textContent = "Verifying Payment...";
+      simulateBraceletBtnLabel.textContent = "Verifying Payment...";
+      submitCardBtnLabel.textContent = "Authorizing Card...";
+
+      [
+        simulateCardTapBtn,
+        simulateBraceletTapBtn,
+        submitCardPaymentBtn,
+        nfcCancelBtn,
+        nfcCancelSecondaryBtn,
+        cardCancelSecondaryBtn,
+        tabTapNfcBtn,
+        tabEnterCardBtn
+      ].forEach(el => {
+        el.disabled = true;
+        el.classList.add("opacity-60", "pointer-events-none");
+      });
+
+      state.nfcTimerId = setTimeout(() => {
+        completeNfcAndConfirmOrder();
+      }, 1250);
+    }
+
+    // Payment event listeners
+    tabTapNfcBtn.addEventListener("click", () => setPaymentTab("tap"));
+    tabEnterCardBtn.addEventListener("click", () => setPaymentTab("card"));
+
+    placeOrderBtn.addEventListener("click", openNfcPaymentScreen);
+    nfcCancelBtn.addEventListener("click", cancelNfcPayment);
+    nfcCancelSecondaryBtn.addEventListener("click", cancelNfcPayment);
+    cardCancelSecondaryBtn.addEventListener("click", cancelNfcPayment);
+
+    simulateCardTapBtn.addEventListener("click", () => {
+      triggerPaymentVerification({
+        methodLabel: "Contactless Card",
+        remainingBalance: null,
+        statusTitle: "Reading Contactless Card...",
+        statusSubtitle: "Authorizing debit/credit card before order confirmation.",
+        hintText: "Contactless EMV token verified..."
+      });
+    });
+
+    simulateBraceletTapBtn.addEventListener("click", () => {
+      handleBraceletScanResult(
+        {
+          id: "WB-209",
+          balance: state.simulatedBraceletBalance
+        },
+        true
+      );
+    });
+
+    // Card input formatting
+    cardNumberInput.addEventListener("input", e => {
+      const digits = e.target.value.replace(/\D/g, "").slice(0, 16);
+      e.target.value = digits.replace(/(.{4})/g, "$1 ").trim();
+    });
+
+    cardExpiryInput.addEventListener("input", e => {
+      const digits = e.target.value.replace(/\D/g, "").slice(0, 4);
+      if (digits.length >= 3) {
+        e.target.value = `${digits.slice(0, 2)}/${digits.slice(2)}`;
+      } else {
+        e.target.value = digits;
+      }
+    });
+
+    cardCvvInput.addEventListener("input", e => {
+      e.target.value = e.target.value.replace(/\D/g, "").slice(0, 4);
+    });
+
+    enterCardPanel.addEventListener("submit", e => {
+      e.preventDefault();
+      if (state.isProcessingNfc) return;
+
+      const holder = cardHolderInput.value.trim();
+      const rawDigits = cardNumberInput.value.replace(/\D/g, "");
+      const expiry = cardExpiryInput.value.trim();
+      const cvv = cardCvvInput.value.trim();
+
+      if (!holder) {
+        cardFormError.textContent = "Please enter the cardholder name.";
+        cardFormError.classList.remove("hidden");
+        return;
+      }
+      if (rawDigits.length < 13) {
+        cardFormError.textContent = "Please enter a valid 13–16 digit debit or credit card number.";
+        cardFormError.classList.remove("hidden");
+        return;
+      }
+      if (!/^(0[1-9]|1[0-2])\/\d{2}$/.test(expiry)) {
+        cardFormError.textContent = "Please enter a valid expiry date in MM/YY format.";
+        cardFormError.classList.remove("hidden");
+        return;
+      }
+      if (cvv.length < 3) {
+        cardFormError.textContent = "Please enter a valid 3- or 4-digit CVV.";
+        cardFormError.classList.remove("hidden");
+        return;
+      }
+
+      cardFormError.classList.add("hidden");
+      const last4 = rawDigits.slice(-4);
+      triggerPaymentVerification({
+        methodLabel: `Card •••• ${last4}`,
+        remainingBalance: null
+      });
+    });
+
+    // Keyboard shortcuts on payment screen
+    document.addEventListener("keydown", e => {
+      if (document.activeElement === searchInput || document.activeElement.tagName === "INPUT") return;
+      if (nfcPaymentOverlay.classList.contains("hidden")) return;
+      if (e.key === "Escape") {
+        cancelNfcPayment();
+      } else if (state.activePaymentTab === "tap" && (e.key === "Enter" || e.key === " ")) {
+        e.preventDefault();
+        simulateCardTapBtn.click();
+      }
+    });
+
+    startNewOrderBtn.addEventListener("click", () => {
+      stopRealNfcScan();
+      resetNfcVisualState();
+      cardHolderInput.value = "";
+      cardNumberInput.value = "";
+      cardExpiryInput.value = "";
+      cardCvvInput.value = "";
+      state.cart = [];
+      state.searchQuery = "";
+      state.activeCategory = "All";
+      searchInput.value = "";
+      clearSearchBtn.classList.add("hidden");
+      renderCategories();
+      renderProducts();
+      updateCartPill();
+      showAttractScreen();
+    });
+
+    // =========================================================
+    // SEARCH & FILTER EVENT LISTENERS
+    // =========================================================
+    searchInput.addEventListener("input", e => {
+      state.searchQuery = e.target.value;
+      clearSearchBtn.classList.toggle("hidden", state.searchQuery.length === 0);
+      renderProducts();
+    });
+
+    clearSearchBtn.addEventListener("click", () => {
+      state.searchQuery = "";
+      searchInput.value = "";
+      clearSearchBtn.classList.add("hidden");
+      searchInput.focus();
+      renderProducts();
+    });
+
+    resetFiltersBtn.addEventListener("click", () => {
+      state.searchQuery = "";
+      state.activeCategory = "All";
+      searchInput.value = "";
+      clearSearchBtn.classList.add("hidden");
+      renderCategories();
+      renderProducts();
+    });
+
+    // Initial Boot
+    renderCategories();
+    renderProducts();
+    updateCartPill();
+  </script>
+</body>
+</html>
